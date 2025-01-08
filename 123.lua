@@ -3,7 +3,7 @@ local Settings = {
     Box_Color = Color3.fromRGB(255, 0, 0),
     Box_Thickness = 1,
     Text_Size = 16,
-    Box_Radius = 10, -- Rounded corners for ESP boxes
+    Box_Radius = 10, -- Rounded corners for ESP
 }
 
 local Team_Check = {
@@ -106,8 +106,7 @@ local function ESP(plr)
                     local d = (Vector2.new(HumPos.X - DistanceY, HumPos.Y - DistanceY * 2) - Vector2.new(HumPos.X - DistanceY, HumPos.Y + DistanceY * 2)).magnitude
                     local healthoffset = plr.Character.Humanoid.Health / plr.Character.Humanoid.MaxHealth * d
 
-
-library.greenhealth.From = Vector2.new(HumPos.X - DistanceY - 4, HumPos.Y + DistanceY * 2)
+                    library.greenhealth.From = Vector2.new(HumPos.X - DistanceY - 4, HumPos.Y + DistanceY * 2)
                     library.greenhealth.To = Vector2.new(HumPos.X - DistanceY - 4, HumPos.Y + DistanceY * 2 - healthoffset)
 
                     library.healthbar.From = Vector2.new(HumPos.X - DistanceY - 4, HumPos.Y + DistanceY * 2)
@@ -146,9 +145,28 @@ library.greenhealth.From = Vector2.new(HumPos.X - DistanceY - 4, HumPos.Y + Dist
 
     -- Track ESP objects
     ESP_Library[plr] = library
+
+    -- Cleanup on player death
+    plr.CharacterAdded:Connect(function()
+        if ESP_Library[plr] then
+            cleanupPlayerESP(plr)
+        end
+    end)
 end
 
--- Cleanup Function
+-- Function to cleanup individual player's ESP
+local function cleanupPlayerESP(plr)
+    if ESP_Library[plr] then
+        for _, obj in pairs(ESP_Library[plr]) do
+            if obj then
+                obj:Remove()
+            end
+        end
+        ESP_Library[plr] = nil
+    end
+end
+
+-- Cleanup function to remove all ESPs
 local function cleanup()
     for _, library in pairs(ESP_Library) do
         for _, obj in pairs(library) do
@@ -160,18 +178,30 @@ local function cleanup()
     ESP_Library = {}
 end
 
--- Start ESP for all players
+-- Handle player deaths
+game.Players.PlayerAdded:Connect(function(newplr)
+    if newplr.Name ~= player.Name then
+        -- Create ESP for the new player
+        coroutine.wrap(ESP)(newplr)
+        
+        -- Cleanup ESP when the player dies
+        newplr.CharacterAdded:Connect(function()
+            cleanupPlayerESP(newplr)
+        end)
+    end
+end)
+
+-- Ensure cleanup for players leaving
+game.Players.PlayerRemoving:Connect(function(leavingPlayer)
+    cleanupPlayerESP(leavingPlayer)
+end)
+
+-- Start ESP for already existing players
 for _, v in pairs(game:GetService("Players"):GetPlayers()) do
     if v.Name ~= player.Name then
         coroutine.wrap(ESP)(v)
     end
 end
-
-game.Players.PlayerAdded:Connect(function(newplr)
-    if newplr.Name ~= player.Name then
-        coroutine.wrap(ESP)(newplr)
-    end
-end)
 
 -- Expose Cleanup Function
 return cleanup
